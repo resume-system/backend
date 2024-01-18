@@ -1,7 +1,9 @@
 use std::sync::Mutex;
-use diesel::{Connection, MysqlConnection, RunQueryDsl, table};
+use diesel::{Connection, ExpressionMethods, MysqlConnection, OptionalExtension, QueryDsl, RunQueryDsl, table};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use sha256::digest;
+use uuid::Uuid;
 use crate::{CONFIG, DBConfig};
 use crate::Result;
 
@@ -23,7 +25,7 @@ lazy_static! {
 
 table! {
     administrator (administrator_id) {
-        administrator_id -> SmallInt,
+        administrator_id -> Char,
         username -> Varchar,
         password -> Varchar,
     }
@@ -31,7 +33,7 @@ table! {
 
 table! {
     company (company_id) {
-        company_id -> TinyInt,
+        company_id -> Char,
         company_name -> Varchar,
         username -> Varchar,
         email -> Varchar,
@@ -42,15 +44,15 @@ table! {
 
 table! {
     r#match (resume_id, position_id) {
-        resume_id -> SmallInt,
-        position_id -> SmallInt,
+        resume_id -> Char,
+        position_id -> Char,
         match_degree -> Double,
     }
 }
 
 table! {
     position (position_id, company_id) {
-        position_id -> SmallInt,
+        position_id -> Char,
         title -> Varchar,
         company -> Varchar,
         sex -> Char,
@@ -75,7 +77,7 @@ table! {
 
 table! {
     resume(user_id) {
-        user_id -> SmallInt,
+        user_id -> Char,
         name -> Varchar,
         age -> TinyInt,
         sex -> Char,
@@ -96,7 +98,7 @@ table! {
 
 table! {
     user (user_id) {
-        user_id -> SmallInt,
+        user_id -> Char,
         username -> Varchar,
         password -> Varchar,
         email -> Varchar,
@@ -108,7 +110,7 @@ table! {
 #[derive(Insertable, Default)]
 #[table_name = "administrator"]
 pub struct Administrator {
-    pub administrator_id: i16,
+    pub administrator_id: String,
     pub username: String,
     pub password: String,
 }
@@ -116,7 +118,7 @@ pub struct Administrator {
 #[derive(Insertable, Default)]
 #[table_name = "company"]
 pub struct Company {
-    pub company_id: i8,
+    pub company_id: String,
     pub company_name: String,
     pub username: String,
     pub email: String,
@@ -127,15 +129,15 @@ pub struct Company {
 #[derive(Insertable)]
 #[table_name = "r#match"]
 pub struct Match {
-    pub resume_id: i16,
-    pub position_id: i16,
+    pub resume_id: String,
+    pub position_id: String,
     pub match_degree: f64,
 }
 
 #[derive(Insertable, Deserialize, Serialize, Default)]
 #[table_name = "position"]
 pub struct Position {
-    pub position_id: i16,
+    pub position_id: String,
     pub title: String,
     pub company: String,
     pub sex: String,
@@ -161,7 +163,7 @@ pub struct Position {
 #[derive(Insertable, Serialize, Deserialize, Default)]
 #[table_name = "resume"]
 pub struct Resume {
-    pub user_id: i16,
+    pub user_id: String,
     pub name: String,
     pub age: i8,
     pub sex: String,
@@ -180,10 +182,10 @@ pub struct Resume {
     pub address_expect: String,
 }
 
-#[derive(Insertable, Serialize, Deserialize, Default)]
+#[derive(Queryable, Insertable, Serialize, Deserialize, Default)]
 #[table_name = "user"]
 pub struct User {
-    pub user_id: i16,
+    pub user_id: String,
     pub username: String,
     pub password: String,
     pub email: String,
@@ -237,10 +239,73 @@ pub mod naive_datetime_format {
     }
 }
 
-pub fn register(info: User) -> Result<()> {
+fn new_uuid() -> String {
+    Uuid::new_v4().to_string()
+}
+
+static SALT: &str = "HAYASE_YUUKA";
+
+pub trait SHA256 {
+    fn sha256(&self) -> String;
+}
+
+impl SHA256 for String {
+    fn sha256(&self) -> String {
+        digest(format!("{}{}", self, SALT))
+    }
+}
+
+impl SHA256 for &str {
+    fn sha256(&self) -> String {
+        digest(format!("{}{}", self, SALT))
+    }
+}
+
+pub fn insert_user(info: User) -> Result<()> {
     diesel::insert_into(user::table)
         .values(&info)
         .execute(&mut ENGINE.lock().unwrap().db)?;
 
     Ok(())
+}
+
+pub fn user_exists(username: impl AsRef<str>) -> Result<bool> {
+    Ok(
+        diesel::select(
+            diesel::dsl::exists(
+                user::table.filter(
+                    user::username.eq(username.as_ref())
+                )
+            )
+        ).get_result::<bool>(&mut ENGINE.lock().unwrap().db)?
+    )
+}
+
+pub fn query_user_by_username(username: impl AsRef<str>) -> Result<Option<User>> {
+    Ok(
+        user::table.find(username.as_ref())
+            .first::<User>(&mut ENGINE.lock().unwrap().db)
+            .optional()?
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_insert_user_and_check() {
+        let user = User {
+            user_id: new_uuid(),
+            username: "Tlipoca".to_string(),
+            password: "Tlipoca".sha256(),
+            email: "remilia50093@gmail.com".to_string(),
+            phone: "123456789".to_string(),
+            state: "F".to_string(),
+        };
+
+        insert_user(user).expect("failed to insert");
+
+        assert_eq!(user_exists("Tlipoca").unwrap(), true);
+    }
 }

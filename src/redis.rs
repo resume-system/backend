@@ -3,6 +3,7 @@ use rand::Rng;
 use redis::Commands;
 use serde::{Deserialize, Serialize};
 use crate::CONFIG;
+use crate::email::EMAIL;
 use crate::Result;
 
 lazy_static! {
@@ -72,20 +73,25 @@ impl Captcha {
         let captcha = match flag {
             true => {
                 let mut captcha = Self::from_redis(id.as_ref())?.unwrap();
-                let new_captcha =
-                    Self::new_with_text(std::mem::take(&mut captcha.text));
 
-                new_captcha.save_redis(id)?;
+                let new_captcha = if captcha.expiration <= chrono::Local::now().naive_local() {
+                        Self::new_with_text(std::mem::take(&mut captcha.text))
+                    } else {
+                        Self::default()
+                    };
+
                 new_captcha
             }
             false => {
-                let captcha = Self::default();
-
-                captcha.save_redis(id)?;
-                captcha
+                Self::default();
             }
         };
 
+        captcha.save_redis(id)?;
         Ok(captcha)
+    }
+
+    pub fn send_to_email(id: impl AsRef<str>, email: impl AsRef<str>) -> Result<()> {
+        todo!()
     }
 }

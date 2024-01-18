@@ -14,4 +14,10 @@ pub enum RError {
     LettreAddressError(#[from] lettre::address::AddressError),
     #[error("Diesel Error: {0}")]
     DieselError(#[from] diesel::result::Error),
+    #[error("Actix Error: {0}")]
+    ActixError(#[from] actix_web::Error),
+}
+
+impl actix_web::ResponseError for RError {
+
 }

@@ -1,4 +1,3 @@
-use actix_web::error::UrlencodedError::ContentType;
 use lazy_static::lazy_static;
 use lettre::message::MessageBuilder;
 use lettre::{SmtpTransport, Transport};
