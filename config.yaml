@@ -1,0 +1,16 @@
+db:
+  username: root
+  password: KING=123456
+  db_name: resume_system
+log:
+  level: info
+redis:
+  url: redis://127.0.0.1/
+email:
+#  server: smtp.gmail.com
+  server: smtp.qq.com
+  port: 465
+  protocol: TLS
+  from: 1049617132@qq.com
+  password: slnsqwavwpgibdja
+#  password: uxemywjrylygpgdp
