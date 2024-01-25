@@ -1,3 +1,6 @@
+system:
+  # 必填 项目绑定的端口
+  port: 8080
 db:
   username: root
   password: KING=123456
