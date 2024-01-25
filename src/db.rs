@@ -182,7 +182,7 @@ pub struct Resume {
     pub address_expect: String,
 }
 
-#[derive(Queryable, Insertable, Serialize, Deserialize, Default)]
+#[derive(Queryable, Insertable, Serialize, Deserialize, Default, Debug)]
 #[table_name = "user"]
 pub struct User {
     pub user_id: String,
@@ -261,6 +261,22 @@ impl SHA256 for &str {
     }
 }
 
+pub fn insert_user_with_fields(
+    username: impl Into<String>,
+    password: impl Into<String>,
+    email: impl Into<String>,
+    phone: impl Into<String>,
+) -> Result<()> {
+    insert_user(User {
+        user_id: new_uuid(),
+        username: username.into(),
+        password: password.into().sha256(),
+        email: email.into(),
+        phone: phone.into(),
+        state: "F".to_string(),
+    })
+}
+
 pub fn insert_user(info: User) -> Result<()> {
     diesel::insert_into(user::table)
         .values(&info)
@@ -287,6 +303,17 @@ pub fn query_user_by_username(username: impl AsRef<str>) -> Result<Option<User>>
             .first::<User>(&mut ENGINE.lock().unwrap().db)
             .optional()?
     )
+}
+
+pub fn verify_user(username: impl AsRef<str>) -> Result<()> {
+    diesel::update(
+        user::table.filter(
+            user::user_id.eq(username.as_ref())
+        )
+    ).set(user::state.eq("T"))
+    .execute(&mut ENGINE.lock().unwrap().db)?;
+
+    Ok(())
 }
 
 #[cfg(test)]

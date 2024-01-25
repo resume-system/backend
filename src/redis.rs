@@ -83,7 +83,7 @@ impl Captcha {
                 new_captcha
             }
             false => {
-                Self::default();
+                Self::default()
             }
         };
 

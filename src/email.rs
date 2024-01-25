@@ -5,6 +5,7 @@ use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 use lettre::transport::smtp::PoolConfig;
 use native_tls::TlsConnector;
 use crate::{CONFIG, Result};
+use crate::redis::Captcha;
 
 lazy_static! {
     pub static ref EMAIL: Email = {
@@ -46,6 +47,16 @@ impl Email {
         mailer.send(&msg)?;
 
         Ok(())
+    }
+
+    pub fn send_captcha(&self, target: impl AsRef<str>, id: impl AsRef<str>) -> Result<Captcha> {
+        let captcha = Captcha::new_captcha(id.as_ref())?;
+
+        self.send(target, format!("{}", captcha.text.as_str()))?;
+
+        Ok(
+            captcha
+        )
     }
 }
 
